@@ -27,6 +27,7 @@ mqrabbit_host = os.getenv("MQRABBIT_HOST")
 mqrabbit_vhost = os.getenv("MQRABBIT_VHOST")
 mqrabbit_port = os.getenv("MQRABBIT_PORT")
 mqrabbit_exchange = os.getenv("MQRABBIT_EXCHANGE")
+mqrabbit_destination = os.getenv("MQRABBIT_DESTINATION")
 
 globalstate = {}
 
@@ -216,7 +217,7 @@ def start_writer(queue, condition,
                 message = { 'list': [ 
                                 { "text": "{0}/{1} OK".format(curmeta['ok'],curmeta['total']), "color": color } ], 'type': 'list', 'key': 'nagiosmeta' }
                 print("[W] Message: [{0}]".format(json.dumps(message)))
-                channel.basic_publish(exchange='', routing_key='nagios_queue', body=json.dumps(message))
+                channel.basic_publish(exchange='', routing_key=mqrabbit_destination, body=json.dumps(message))
             else:
                 print("[W] No state to send...")
                 message = { 'list': [ 
