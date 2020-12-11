@@ -28,7 +28,4 @@ The docker image requires the following environment variables to be defined:
 <dt>MQRABBIT_DESTINATION</dt>
 <dd>The routing key of the rabbitmq queue that the rgb display messages will be ingested into</dd>
 
-<dt>NAGIOS_PASSWORD</dt>
-<dd>The password for accessing the nagios server</dd>
-
 </dl>
