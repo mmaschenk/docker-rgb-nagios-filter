@@ -11,6 +11,7 @@ import threading
 import datetime
 import copy
 import uuid
+import traceback
 
 PENDING = 1
 OK = 2 
@@ -148,6 +149,8 @@ def readeventsloop(
     print('[R] Waiting for messages. To exit press CTRL+C')
     channel.start_consuming()
 
+    
+
 def start_writer(queue, condition,
             mqrabbit_user=mqrabbit_user,
             mqrabbit_password=mqrabbit_password, 
@@ -226,11 +229,30 @@ def start_writer(queue, condition,
             if queue.empty():
                 break
 
+def keep_writing(queue, condition,
+            mqrabbit_user=mqrabbit_user,
+            mqrabbit_password=mqrabbit_password, 
+            mqrabbit_host=mqrabbit_host,
+            mqrabbit_vhost=mqrabbit_vhost,
+            mqrabbit_port=mqrabbit_port):
+
+    while True:
+        try:
+            start_writer(queue, condition)
+        except Exception as e:
+            print("[W] Writer ended unexpectedly")
+            stack = traceback.format_stack()
+            for l in stack:
+                for sl in l.split('\n')[:-1]:
+                    print("[W] [Exception]: {0}".format(sl))
+            print("[W] Restarting writer")            
+
+
 def main():
     q = queue.Queue()
     writerWaitState = threading.Condition()
 
-    writer_thread = threading.Thread(target=start_writer, args=(q,writerWaitState))
+    writer_thread = threading.Thread(target=keep_writing, args=(q,writerWaitState))
     writer_thread.start()
     readeventsloop(queue=q,condition=writerWaitState)
 
