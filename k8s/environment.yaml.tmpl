@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: environment
+data:
+  MQRABBIT_USER: nagios
+  MQRABBIT_HOST: "hostame for mqrabbit server"
+  MQRABBIT_VHOST: "virtual host for mqrabbit. Defaults to /"
+  MQRABBIT_PORT: "Port on which to contact mqrabbit"
+  MQRABBIT_EXCHANGE: "Name of the mqrabbit exchange to which to post"
+  NAGIOS_URL: "URL of the detailed nagios service list"
+  NAGIOS_USER: nagiosadmin
+  MEASURE_INTERVAL: "Interval in seconds in which to contact the nagios server"
