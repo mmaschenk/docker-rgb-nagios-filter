@@ -203,8 +203,14 @@ def start_writer(queue, condition,
                         statuscode = val['status']
                         message.append( {"text": "{0} ({1}) ".format(key, delta),
                                     "color": colortable[statuscode] } )
-                    except:
-                        pass
+                    except Exception as e:
+                        print("[W] Exception handling item")
+                        print("[W] [Exception handling item]: {0}".format(getattr(e, 'message', repr(e))))
+                        stack = traceback.format_stack()
+                        for l in stack:
+                            for sl in l.split('\n'):
+                                print("[W] [Exception handling item]: {0}".format(sl))
+                        print("[W] Continuing")            
                 message = { 'list': message, 'type': 'list', 'key': 'nagios'}
                 print("[W] Sending: [{0}]".format(message))
                 channel.basic_publish(exchange='', routing_key='nagios_queue', 
