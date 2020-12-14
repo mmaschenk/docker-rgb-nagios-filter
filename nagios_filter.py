@@ -170,11 +170,11 @@ def start_writer(queue, condition,
     condition.acquire()
     curstate = None
     colortable = {
-        PENDING: 'ffff00',
-        OK: '00ff00',
-        WARNING: '00ffff',
-        UNKNOWN: '0000ff',
-        CRITICAL: 'ff0000',
+        PENDING: ['ffff00', 'ffff00'],
+        OK: ['00ff00', '00ff00'],
+        WARNING: ['00ffff', '00ffff'],
+        UNKNOWN: ['0000ff', '0000ff'],
+        CRITICAL: ['ffff00', 'ff0000'],
     }
     while True:
         print("[W] Waiting for queue")    
@@ -196,13 +196,15 @@ def start_writer(queue, condition,
                         print("{0} -> [{1}]".format(key, val['status']))
                         lok = datetime.datetime.strptime(val['last_time_ok'], '%Y-%m-%dT%H:%M:%S.%f')
                         lu = datetime.datetime.strptime(val['last_update'], '%Y-%m-%dT%H:%M:%S.%f')
+                        st = val['state_type']
                         print("[W] \tLast time OK: {0}".format(lok))
                         print("[W] \tLast update: {0}".format(lu))
+                        print("[W] \tState: {0}".format(st))
                         delta = lu - lok
                         print("[W] \tDowntime: {0}".format(delta))
                         statuscode = val['status']
                         message.append( {"text": "{0} ({1}) ".format(key, delta),
-                                    "color": colortable[statuscode] } )
+                                    "color": colortable[statuscode][st] } )
                     except Exception as e:
                         print("[W] Exception handling item")
                         print("[W] [Exception handling item]: {0}".format(getattr(e, 'message', repr(e))))
