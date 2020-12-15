@@ -1,13 +1,26 @@
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
+  labels:
+    app: rgb-nagios-filter
   name: rgb-nagios-filter
 spec:
-  containers:
-  - name: rgb-nagios-filter
-    image: mmaschenk/rgb-nagios-filter:1.3
-    envFrom:
-    - secretRef:
-        name: passwords
-    - configMapRef:
-        name: rgb-environment
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: rgb-nagios-filter
+  template:
+    metadata:
+      labels:
+        app: rgb-nagios-filter
+    spec:
+      containers:
+      - name: rgb-nagios-filter
+        image: mmaschenk/rgb-nagios-filter:1.3
+        envFrom:
+        - secretRef:
+            name: passwords
+        - configMapRef:
+            name: rgb-environment
