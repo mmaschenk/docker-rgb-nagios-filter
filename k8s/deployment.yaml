@@ -5,11 +5,9 @@ metadata:
 spec:
   containers:
   - name: rgb-nagios-filter
-    image: mmaschenk/rgb-nagios-filter:1.0
-#    command: [ 'sleep' ]
-#    args: [ "3600" ]
+    image: mmaschenk/rgb-nagios-filter:1.3
     envFrom:
     - secretRef:
         name: passwords
     - configMapRef:
-        name: environment
+        name: rgb-environment

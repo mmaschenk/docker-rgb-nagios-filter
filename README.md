@@ -1,6 +1,6 @@
 # docker-rgb-nagios-filter
 
-This component is used to retrieve nagios satuses from an rabbitmq and ingest these into a rabbitmq exchange for further processing by other components.
+This component is used to retrieve nagios satuses from a rabbitmq and ingest these into a rabbitmq exchange for further processing by other components.
 
 The component is autobuilt into the docker image mmaschenk/nagios-retriever
 

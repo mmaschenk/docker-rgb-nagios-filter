@@ -22,6 +22,14 @@ UP = 2
 DOWN = 4
 UNREACHABLE = 8
 
+colortable = {
+        PENDING: ['ffff00', 'ffff00'],
+        OK: ['00ff00', '00ff00'],
+        WARNING: ['00ffff', '00ffff'],
+        UNKNOWN: ['0000ff', '0000ff'],
+        CRITICAL: ['ffff00', 'ff0000'],
+    }
+
 mqrabbit_user = os.getenv("MQRABBIT_USER")
 mqrabbit_password = os.getenv("MQRABBIT_PASSWORD")
 mqrabbit_host = os.getenv("MQRABBIT_HOST")
@@ -149,7 +157,38 @@ def readeventsloop(
     print('[R] Waiting for messages. To exit press CTRL+C')
     channel.start_consuming()
 
-    
+def todisplayentry(key, val):
+    def shorten(key):
+        svcname, host = key.lower().split('@')
+
+        w = "".join([x[0] for x in svcname.split()])
+        print(w)
+
+        host = host.replace('.tudelft.nl', '.tu')
+        return "{0}@{1}".format(w,host)
+
+    def showdelta(delta):        
+        deltahours, deltaminutes = divmod( delta.seconds // 60, 60)        
+
+        if delta.days > 0:
+            return "{0:d}+{1:02d}:{2:02d}".format(deltadays, deltahours, deltaminutes)
+        else:
+            return "{0:02d}:{1:02d}".format(deltahours, deltaminutes)
+
+    lok = datetime.datetime.strptime(val['last_time_ok'], '%Y-%m-%dT%H:%M:%S.%f')
+    lu = datetime.datetime.strptime(val['last_update'], '%Y-%m-%dT%H:%M:%S.%f')
+    st = val['state_type']
+    print("[W] \tLast time OK: {0}".format(lok))
+    print("[W] \tLast update: {0}".format(lu))
+    print("[W] \tState: {0}".format(st))
+    delta = lu - lok
+    print("[W] \tDowntime: {0}".format(delta))
+    statuscode = val['status']
+    if st == 1:
+        text = "{0} ({1}) ".format(key, showdelta(delta))
+    else:
+        text = "{0} ({1}) ".format(shorten(key), showdelta(delta))
+    return {"text": text, "color": colortable[statuscode][st] }
 
 def start_writer(queue, condition,
             mqrabbit_user=mqrabbit_user,
@@ -169,13 +208,7 @@ def start_writer(queue, condition,
     channel = mqconnection.channel()
     condition.acquire()
     curstate = None
-    colortable = {
-        PENDING: ['ffff00', 'ffff00'],
-        OK: ['00ff00', '00ff00'],
-        WARNING: ['00ffff', '00ffff'],
-        UNKNOWN: ['0000ff', '0000ff'],
-        CRITICAL: ['ffff00', 'ff0000'],
-    }
+    
     while True:
         print("[W] Waiting for queue")    
         c = condition.wait(120)
@@ -193,18 +226,8 @@ def start_writer(queue, condition,
                 message = []
                 for key, val  in curstate.items():
                     try:
-                        print("{0} -> [{1}]".format(key, val['status']))
-                        lok = datetime.datetime.strptime(val['last_time_ok'], '%Y-%m-%dT%H:%M:%S.%f')
-                        lu = datetime.datetime.strptime(val['last_update'], '%Y-%m-%dT%H:%M:%S.%f')
-                        st = val['state_type']
-                        print("[W] \tLast time OK: {0}".format(lok))
-                        print("[W] \tLast update: {0}".format(lu))
-                        print("[W] \tState: {0}".format(st))
-                        delta = lu - lok
-                        print("[W] \tDowntime: {0}".format(delta))
-                        statuscode = val['status']
-                        message.append( {"text": "{0} ({1}) ".format(key, delta),
-                                    "color": colortable[statuscode][st] } )
+                        print("[W] {0} -> [{1}]".format(key, val['status']))
+                        message.append( todisplayentry(key, val) )
                     except Exception as e:
                         print("[W] Exception handling item")
                         print("[W] [Exception handling item]: {0}".format(getattr(e, 'message', repr(e))))
