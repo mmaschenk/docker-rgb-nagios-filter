@@ -22,6 +22,9 @@ UP = 2
 DOWN = 4
 UNREACHABLE = 8
 
+metacycle = 120
+
+metadelta = datetime.timedelta(seconds=metacycle)
 colortable = {
         PENDING: ['ffff00', 'ffff00'],
         OK: ['00ff00', '00ff00'],
@@ -62,7 +65,7 @@ def outputstate(queue, condition):
 
 def outputmeta(queue, condition, okcount, totalcount):
     print("[R] Outputting metadata")
-    message = {'meta': { 'ok': okcount, 'total': totalcount } }
+    message = {'meta': { 'ok': okcount, 'total': totalcount, 'measuretime': datetime.datetime.now() } }
     print("[R] ", message)
     queue.put(message)
     with condition:
@@ -157,6 +160,14 @@ def readeventsloop(
     print('[R] Waiting for messages. To exit press CTRL+C')
     channel.start_consuming()
 
+def showdelta(delta):        
+    deltahours, deltaminutes = divmod( delta.seconds // 60, 60)        
+
+    if delta.days > 0:
+        return "{0:d}+{1:02d}:{2:02d}".format(deltadays, deltahours, deltaminutes)
+    else:
+        return "{0:02d}:{1:02d}".format(deltahours, deltaminutes)
+
 def todisplayentry(key, val):
     def shorten(key):
         svcname, host = key.lower().split('@')
@@ -166,14 +177,6 @@ def todisplayentry(key, val):
 
         host = host.replace('.tudelft.nl', '.tu')
         return "{0}@{1}".format(w,host)
-
-    def showdelta(delta):        
-        deltahours, deltaminutes = divmod( delta.seconds // 60, 60)        
-
-        if delta.days > 0:
-            return "{0:d}+{1:02d}:{2:02d}".format(deltadays, deltahours, deltaminutes)
-        else:
-            return "{0:02d}:{1:02d}".format(deltahours, deltaminutes)
 
     lok = datetime.datetime.strptime(val['last_time_ok'], '%Y-%m-%dT%H:%M:%S.%f')
     lu = datetime.datetime.strptime(val['last_update'], '%Y-%m-%dT%H:%M:%S.%f')
@@ -189,6 +192,29 @@ def todisplayentry(key, val):
     else:
         text = "{0} ({1}) ".format(shorten(key), showdelta(delta))
     return {"text": text, "color": colortable[statuscode][st] }
+
+def metamessage(metadata):
+    print("[W] Formatting metadata [{0}]".format(metadata))  
+    age = datetime.datetime.now() - metadata['measuretime']
+    print("[W] Age: {0}".format(age))
+    if metadata['ok'] == metadata['total']:
+        color = '00ff00'
+    elif metadata['total'] - metadata['ok'] < 5:
+        color = 'ffff00'
+    else:
+        color = 'ff0000'
+    message = { 'list': [ 
+                    { "text": "{0}/{1}".format(metadata['ok'],metadata['total']), "color": color } ], 
+                'type': 'list', 
+                'key': 'nagiosmeta' }
+
+    if age > 2*metadelta:
+        message['list'].append( { 
+            'text': "({0})".format(showdelta(age)),
+            'color': 'ff0000' })
+    
+    return message
+
 
 def start_writer(queue, condition,
             mqrabbit_user=mqrabbit_user,
@@ -208,17 +234,18 @@ def start_writer(queue, condition,
     channel = mqconnection.channel()
     condition.acquire()
     curstate = None
+    lastmeta = None
     
     while True:
         print("[W] Waiting for queue")    
-        c = condition.wait(120)
+        c = condition.wait(metacycle)
         print("[W] Running queue [{0}]".format(c))
         queueitem = {}
         while True:
             if not queue.empty():
                 queueitem = queue.get()
                 print("[W] Read new current state")            
-            print("[W] ",queueitem);
+            print("[W] ",queueitem)
             curstate = queueitem.get('servicelist', None)
             curmeta = queueitem.get('meta', None)
             if curstate != None:
@@ -242,20 +269,18 @@ def start_writer(queue, condition,
                                 body=json.dumps(message))
             elif curmeta:
                 print("[W] Sending meta state")
-                if curmeta['ok'] == curmeta['total']:
-                    color = '00ff00'
-                elif curmeta['total'] - curmeta['ok'] < 5:
-                    color = 'ffff00'
-                else:
-                    color = 'ff0000'
-                message = { 'list': [ 
-                                { "text": "{0}/{1} OK".format(curmeta['ok'],curmeta['total']), "color": color } ], 'type': 'list', 'key': 'nagiosmeta' }
+                message = metamessage(curmeta)                                
                 print("[W] Message: [{0}]".format(json.dumps(message)))
                 channel.basic_publish(exchange='', routing_key=mqrabbit_destination, body=json.dumps(message))
+                lastmeta = curmeta
             else:
-                print("[W] No state to send...")
-                message = { 'list': [ 
-                                { "text": "No failed services ", "color": '00ff00' } ], 'type': 'list', 'key': 'nagios' }
+                if lastmeta != None:
+                    print("[W] Re-sending meta state")
+                    message = metamessage(lastmeta)
+                    print("[W] Message: [{0}]".format(json.dumps(message)))
+                    channel.basic_publish(exchange='', routing_key=mqrabbit_destination, body=json.dumps(message))
+                else:
+                    print("[W] No previous state to resend...")
 
             if queue.empty():
                 break
