@@ -164,7 +164,7 @@ def showdelta(delta):
     deltahours, deltaminutes = divmod( delta.seconds // 60, 60)        
 
     if delta.days > 0:
-        return "{0:d}+{1:02d}:{2:02d}".format(deltadays, deltahours, deltaminutes)
+        return "{0:d}+{1:02d}:{2:02d}".format(delta.days, deltahours, deltaminutes)
     else:
         return "{0:02d}:{1:02d}".format(deltahours, deltaminutes)
 
