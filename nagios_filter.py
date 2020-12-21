@@ -11,7 +11,6 @@ import threading
 import datetime
 import copy
 import uuid
-import traceback
 
 PENDING = 1
 OK = 2 
@@ -109,10 +108,12 @@ def callback(queue, condition, ch, method, properties, body):
                 print("[R] Adding key")
                 changed = update(globalstate, key, status) or changed
         except Exception as e:        
-            tb = traceback.extract_stack()
-            frame = tb[-2]        
             print("[R] Error parsing json: {0}".format(status))
-            print("[R] Exception thrown: [{0}: {1}] at {2} of {3}".format(type(e).__name__, e, frame.lineno, frame.filename))
+            print("[R] [Exception handling record]: {0}".format(getattr(e, 'message', repr(e))))
+            stack = traceback.format_list(traceback.extract_tb(e.__traceback__))
+            for l in stack:
+                            for sl in l.split('\n'):
+                                print("[R] [Exception handling record]: {0}".format(sl))
             print("[R] Record ignored")
             raise
     if changed:
@@ -297,7 +298,7 @@ def keep_writing(queue, condition,
             start_writer(queue, condition)
         except Exception as e:
             print("[W] Writer ended unexpectedly")
-            stack = traceback.format_stack()
+            stack = traceback.format_list(traceback.extract_tb(e.__traceback__))
             for l in stack:
                 for sl in l.split('\n')[:-1]:
                     print("[W] [Exception]: {0}".format(sl))

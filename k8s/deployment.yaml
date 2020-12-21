@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
       - name: rgb-nagios-filter
-        image: mmaschenk/rgb-nagios-filter:1.4
+        image: mmaschenk/rgb-nagios-filter:1.4.1
         envFrom:
         - secretRef:
             name: passwords
