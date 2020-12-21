@@ -258,7 +258,7 @@ def start_writer(queue, condition,
                     except Exception as e:
                         print("[W] Exception handling item")
                         print("[W] [Exception handling item]: {0}".format(getattr(e, 'message', repr(e))))
-                        stack = traceback.format_stack()
+                        stack = traceback.format_list(traceback.extract_tb(e.__traceback__))
                         for l in stack:
                             for sl in l.split('\n'):
                                 print("[W] [Exception handling item]: {0}".format(sl))
