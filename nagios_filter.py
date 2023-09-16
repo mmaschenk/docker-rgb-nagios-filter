@@ -23,6 +23,8 @@ UNREACHABLE = 8
 
 metacycle = 120
 
+failed = False
+
 metadelta = datetime.timedelta(seconds=metacycle)
 colortable = {
         PENDING: ['ffff00', 'ffff00'],
@@ -238,6 +240,12 @@ def start_writer(queue, condition,
     lastmeta = None
     
     while True:
+        global failed
+
+        if failed:
+            print("[W] ending because global failed is true")
+            break
+
         print("[W] Waiting for queue")    
         c = condition.wait(metacycle)
         print("[W] Running queue [{0}]".format(c))
@@ -302,7 +310,14 @@ def keep_writing(queue, condition,
             for l in stack:
                 for sl in l.split('\n')[:-1]:
                     print("[W] [Exception]: {0}".format(sl))
-            print("[W] Restarting writer")            
+            global failed
+
+            if failed:
+                print("[W] Failing because global failed is true")
+                break
+            else:
+                print("[W] Restarting writer")
+    print("[W] Ended writer loop")
 
 
 def main():
@@ -311,7 +326,13 @@ def main():
 
     writer_thread = threading.Thread(target=keep_writing, args=(q,writerWaitState))
     writer_thread.start()
-    readeventsloop(queue=q,condition=writerWaitState)
+
+    try:
+        readeventsloop(queue=q,condition=writerWaitState)
+    except:
+        global failed
+        failed = True
+
 
 if __name__ == "__main__":
     main()
