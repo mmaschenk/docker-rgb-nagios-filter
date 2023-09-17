@@ -8,6 +8,5 @@ data:
   MQRABBIT_VHOST: "virtual host for mqrabbit. Defaults to /"
   MQRABBIT_PORT: "Port on which to contact mqrabbit"
   MQRABBIT_EXCHANGE: "Name of the mqrabbit exchange to which to post"
-  NAGIOS_URL: "URL of the detailed nagios service list"
-  NAGIOS_USER: nagiosadmin
-  MEASURE_INTERVAL: "Interval in seconds in which to contact the nagios server"
+  MQRABBIT_INPUT_EXCHANGE: "Exchange that holds the nagios events coming in"
+  MQRABBIT_OUTPUT_EXCHANGE: "Exchange that will fan-out the rgb commands for the wall display"

@@ -39,11 +39,10 @@ mqrabbit_password = os.getenv("MQRABBIT_PASSWORD")
 mqrabbit_host = os.getenv("MQRABBIT_HOST")
 mqrabbit_vhost = os.getenv("MQRABBIT_VHOST")
 mqrabbit_port = os.getenv("MQRABBIT_PORT")
-mqrabbit_exchange = os.getenv("MQRABBIT_EXCHANGE")
-mqrabbit_destination = os.getenv("MQRABBIT_DESTINATION")
+mqrabbit_input_exchange = os.getenv("MQRABBIT_INPUT_EXCHANGE")
+mqrabbit_output_exchange = os.getenv("MQRABBIT_OUTPUT_EXCHANGE")
 
 globalstate = {}
-
 
 def outputstate(queue, condition):
     global globalstate
@@ -144,19 +143,24 @@ def readeventsloop(
         virtual_host=mqrabbit_vhost,
         port=mqrabbit_port,
         credentials=mqrabbit_credentials)
+
+    print(f"[R] creating connection as {mqrabbit_user}")
+
     mqconnection = pika.BlockingConnection(mqparameters)
     channel = mqconnection.channel()
-    channel.exchange_declare(exchange=mqrabbit_exchange, exchange_type='fanout')
 
-    queuename = 'nagios_' + str(uuid.uuid1())
+    queuename = 'nagios_filter_' + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    print(f"[R] creating reader queue {queuename}")
     result = channel.queue_declare(queue=queuename, exclusive=True)
     queue_name = result.method.queue
+    print(f"[R] created reader queue")
 
-    channel.queue_bind(exchange=mqrabbit_exchange, queue=queue_name)
+    channel.queue_bind(exchange=mqrabbit_input_exchange, queue=queue_name)
+
+    print(f"[R] reader queue bound to input exchange [{mqrabbit_input_exchange}]")
 
     def cb(ch, method, properties, body):
         callback(queue, condition, ch, method, properties, body)
-
 
     channel.basic_consume(queue=queue_name, on_message_callback=cb)
 
@@ -226,6 +230,8 @@ def start_writer(queue, condition,
             mqrabbit_vhost=mqrabbit_vhost,
             mqrabbit_port=mqrabbit_port):
 
+    global failed
+
     mqrabbit_credentials = pika.PlainCredentials(mqrabbit_user, mqrabbit_password)
     mqparameters = pika.ConnectionParameters(
         host=mqrabbit_host,
@@ -233,20 +239,30 @@ def start_writer(queue, condition,
         port=mqrabbit_port,
         credentials=mqrabbit_credentials)
     
+    print(f"[W] creating connection as {mqrabbit_user}")
     mqconnection = pika.BlockingConnection(mqparameters)
     channel = mqconnection.channel()
+
+    print(f"[W] creating output exchange {mqrabbit_output_exchange}")
+    try:
+        channel.exchange_declare(exchange=mqrabbit_output_exchange, exchange_type='fanout')
+    except Exception as exc:
+        print(f"[W] {traceback.format_exc()}")
+        print(f"[W] {exc}")
+        global failed
+        failed = True
+    print(f"[W] output exchange created")
+
     condition.acquire()
     curstate = None
     lastmeta = None
     
     while True:
-        global failed
-
         if failed:
             print("[W] ending because global failed is true")
             break
 
-        print("[W] Waiting for queue")    
+        print("[W] Waiting for python queue")
         c = condition.wait(metacycle)
         print("[W] Running queue [{0}]".format(c))
         queueitem = {}
@@ -274,20 +290,20 @@ def start_writer(queue, condition,
                         print("[W] Continuing")            
                 message = { 'list': message, 'type': 'list', 'key': 'nagios'}
                 print("[W] Sending: [{0}]".format(message))
-                channel.basic_publish(exchange='', routing_key='nagios_queue', 
+                channel.basic_publish(exchange=mqrabbit_output_exchange, routing_key="_ignore",
                                 body=json.dumps(message))
             elif curmeta:
                 print("[W] Sending meta state")
                 message = metamessage(curmeta)                                
                 print("[W] Message: [{0}]".format(json.dumps(message)))
-                channel.basic_publish(exchange='', routing_key=mqrabbit_destination, body=json.dumps(message))
+                channel.basic_publish(exchange=mqrabbit_output_exchange, routing_key="_ignore", body=json.dumps(message))
                 lastmeta = curmeta
             else:
                 if lastmeta != None:
                     print("[W] Re-sending meta state")
                     message = metamessage(lastmeta)
                     print("[W] Message: [{0}]".format(json.dumps(message)))
-                    channel.basic_publish(exchange='', routing_key=mqrabbit_destination, body=json.dumps(message))
+                    channel.basic_publish(exchange=mqrabbit_output_exchange, routing_key="_ignore", body=json.dumps(message))
                 else:
                     print("[W] No previous state to resend...")
 
@@ -304,19 +320,18 @@ def keep_writing(queue, condition,
     while True:
         try:
             start_writer(queue, condition)
-        except Exception as e:
+        except Exception as exc:
             print("[W] Writer ended unexpectedly")
-            stack = traceback.format_list(traceback.extract_tb(e.__traceback__))
-            for l in stack:
-                for sl in l.split('\n')[:-1]:
-                    print("[W] [Exception]: {0}".format(sl))
-            global failed
+            print(f"[W] {traceback.format_exc()}")
+            print(f"[W] {exc}")
 
-            if failed:
-                print("[W] Failing because global failed is true")
-                break
-            else:
+        global failed
+        if failed:
+            print("[W] ending because global failed is true")
+            break
+        else:
                 print("[W] Restarting writer")
+
     print("[W] Ended writer loop")
 
 
@@ -329,7 +344,9 @@ def main():
 
     try:
         readeventsloop(queue=q,condition=writerWaitState)
-    except:
+    except Exception as exc:
+        print(f"[MAIN] {traceback.format_exc()}")
+        print(f"[MAIN] {exc}")
         global failed
         failed = True
 
